@@ -19,8 +19,50 @@ export function ResultsTable({ results, excelFile }) {
         results.flatMap(r => r.questions ? r.questions.map(q => q.questionId) : [])
     )).sort();
 
+    // Analyze results for flags
+    const flaggedResults = results.map((result, index) => {
+        const issues = [];
+        if (!result.studentName || result.studentName === 'Unknown') {
+            issues.push('שם התלמיד לא זוהה (Unknown)');
+        }
+
+        result.questions?.forEach(q => {
+            if (q.confidence < 95) {
+                issues.push(`שאלה ${q.questionId}: רמת ביטחון נמוכה (${q.confidence}%). סיבה: ${q.uncertaintyReason || 'לא צוינה'}`);
+            }
+        });
+
+        return issues.length > 0 ? { ...result, index, issues } : null;
+    }).filter(r => r !== null);
+
     return (
         <div className="card">
+            {flaggedResults.length > 0 && (
+                <div style={{
+                    backgroundColor: '#fef2f2',
+                    border: '1px solid #ef4444',
+                    borderRadius: '8px',
+                    padding: '1rem',
+                    marginBottom: '2rem'
+                }}>
+                    <h3 style={{ color: '#991b1b', marginTop: 0, display: 'flex', alignItems: 'center' }}>
+                        ⚠️ שימ לב: {flaggedResults.length} מבחנים דורשים בדיקה ידנית
+                    </h3>
+                    <ul style={{ margin: 0, paddingRight: '20px' }}>
+                        {flaggedResults.map((item, i) => (
+                            <li key={i} style={{ marginBottom: '0.5rem', color: '#7f1d1d' }}>
+                                <strong>{item.studentName !== 'Unknown' ? item.studentName : `קובץ #${item.index + 1}`}</strong>:
+                                <ul style={{ marginTop: '0.25rem' }}>
+                                    {item.issues.map((issue, j) => (
+                                        <li key={j}>{issue}</li>
+                                    ))}
+                                </ul>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                 <h2>📊 תוצאות הבדיקה</h2>
                 <button className="btn" onClick={downloadExcel}> הורד אקסל 📥</button>

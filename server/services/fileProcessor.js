@@ -1,5 +1,6 @@
 
-const fs = require('fs');
+
+const mammoth = require('mammoth');
 // Polyfill for pdfjs-dist
 if (!global.DOMMatrix) {
     global.DOMMatrix = class DOMMatrix {
@@ -10,19 +11,21 @@ if (!global.DOMMatrix) {
 const pdf = require('pdf-parse');
 
 async function extractText(file) {
-    const filePath = file.path;
     const mimeType = file.mimetype;
 
     try {
         if (mimeType === 'application/pdf') {
-            const dataBuffer = fs.readFileSync(filePath);
+            const dataBuffer = file.buffer;
             const data = await pdf(dataBuffer);
             return data.text;
+        } else if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+            const result = await mammoth.extractRawText({ buffer: file.buffer });
+            return result.value;
         } else if (mimeType.startsWith('text/') || mimeType === 'application/json') {
-            return fs.readFileSync(filePath, 'utf8');
+            return file.buffer.toString('utf8');
         } else {
-            // For now fallback to treating as text if not PDF
-            return fs.readFileSync(filePath, 'utf8');
+            // For now fallback to treating as text if not PDF/DOCX
+            return file.buffer.toString('utf8');
         }
     } catch (error) {
         console.error(`Failed to extract text from ${file.originalname}:`, error);

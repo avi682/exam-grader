@@ -4,76 +4,90 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 // Access your API key as an environment variable
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-async function gradeExam(examText, rubricText, studentAnswerText) {
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+// Helper to convert buffer to Gemini Part
+function fileToGenerativePart(buffer, mimeType) {
+    return {
+        inlineData: {
+            data: buffer.toString("base64"),
+            mimeType,
+        },
+    };
+}
 
-    const prompt = `
-    You are an expert automated exam grader. 
-    Your task is to grade a student's submission based on the provided Exam Questions and Grading Rubric.
-    
-    Context:
-    ---
-    EXAM QUESTIONS:
-    ${examText}
-    ---
-    GRADING RUBRIC:
+// THE PROMPT ENGINE
+// optimization: Creates a focused system instruction based on the specific rubric
+function constructOptimizedPrompt(rubricText) {
+    return `
+    You are an expert academic grader with advanced handwriting recognition capabilities.
+    Your goal is to grade a student's handwritten exam submission with extreme precision.
+
+    GRADING RUBRIC & INSTRUCTIONS:
     ${rubricText}
-    ---
-    STUDENT SUBMISSION:
-    ${studentAnswerText}
-    ---
 
-    Instructions:
-    1. For each question identified in the exam/rubric, evaluate the student's answer.
-    2. Assign a score based strictly on the rubric.
-    3. Determine a "confidence" score (0-100) for your grading of that specific question.
-       - If the student's handwriting (OCR text) is ambiguous, or the answer is vague and you are guessing, lower the confidence.
-       - If the answer clearly matches or misses the rubric, confidence should be high (95-100).
-    4. Provide a brief comment explaining the deduction or full points.
-    5. If confidence is below 95, explicitly state EXACTLY what part is uncertain (Question X, Section Y).
+    STEP-BY-STEP REASONING (Internal Monologue):
+    1. **Scan & Transcribe**: First, carefully read the handwritten student submission. If a word is ambiguous, look at the context.
+    2. **Locate Student Name**: Find the student's name at the top of the document.
+    3. **Evaluate per Question**: Match each student answer to the corresponding rubric item.
+    4. **Score & Verify**: Assign points. If you are deducted points, verify against the rubric.
+    5. **Assess Confidence**:
+       - High Confidence (95-100%): Handwriting is legible, answer is clear.
+       - Low Confidence (<95%): Handwriting is illegible, ambiguity in meaning, or page is blurry.
 
-    Output Format:
-    Return ONLY valid JSON with this structure:
+    OUTPUT FORMAT:
+    Return pure JSON.
     {
+        "studentName": "Extracted Name",
         "questions": [
-            {
-                "questionId": "1a",
-                "score": 5,
-                "maxScore": 5,
-                "confidence": 100,
-                "comment": "Correctly identified X",
-                "uncertaintyReason": null 
-            },
-            {
-                "questionId": "1b",
-                "score": 2,
-                "maxScore": 5,
-                "confidence": 80,
-                "comment": "Partial credit.",
-                "uncertaintyReason": "Student answer text is garbled, unclear if they meant 'photosynthesis' or 'photography'."
-            }
+            { "questionId": "1", "score": 10, "maxScore": 10, "confidence": 100, "comment": "Perfect answer." }
         ],
-        "totalScore": 7,
+        "totalScore": 10,
         "totalMaxScore": 10
     }
     `;
+}
+
+async function gradeExam(examFileBuffer, examMimeType, rubricText, submissionFileBuffer, submissionMimeType) {
+    // Using gemini-1.5-pro for maximum accuracy and reasoning capabilities
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+
+    const prompt = constructOptimizedPrompt(rubricText);
+
+    const imageParts = [
+        fileToGenerativePart(submissionFileBuffer, submissionMimeType)
+    ];
+
+    // If exam is provided as a file, add it too (optional context)
+    if (examFileBuffer) {
+        // We prepend the exam file so the model sees the blank exam first (context), then the submission
+        imageParts.unshift(fileToGenerativePart(examFileBuffer, examMimeType));
+        imageParts.unshift({ text: "Here is the BLANK EXAM TEMPLATE for reference:" });
+    }
+
+    imageParts.push({ text: "Here is the STUDENT SUBMISSION to grade:" });
+
+    // Add the system prompt at the end or as a system instruction (for simplicity we send it as text part with the request)
+    // In strict Gemini 1.5, system instructions are a separate param, but text parts work well too.
+    const parts = [
+        { text: prompt },
+        ...imageParts
+    ];
 
     try {
-        const result = await model.generateContent(prompt);
+        constresult = await model.generateContent(parts);
         const response = await result.response;
         const text = response.text();
 
-        // Clean up markdown code blocks if present
         const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
         return JSON.parse(jsonStr);
 
     } catch (error) {
         console.error("Gemini Grading Error:", error);
         return {
+            studentName: "Error",
             questions: [],
             totalScore: 0,
             totalMaxScore: 0,
-            error: "Failed to grade submission."
+            error: "Failed to grade submission: " + error.message
         };
     }
 }
