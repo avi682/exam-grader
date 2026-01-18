@@ -1,0 +1,18 @@
+
+services:
+  - type: web
+    name: exam-grader-server
+    env: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: MONGODB_URI
+        fromGroup: exam-grader-settings
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+
