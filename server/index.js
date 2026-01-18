@@ -12,10 +12,22 @@ const port = process.env.PORT || 3000;
 const connectDB = require('./db');
 
 // Connect to Database
-connectDB();
+// Connect to Database
+connectDB().catch(err => console.error("Database Connection Failed (Non-Fatal):", err));
 
 app.use(cors());
 app.use(express.json());
+
+// Health Check Route (for Vercel debugging)
+app.get('/api/health', (req, res) => {
+    res.json({
+        status: 'ok',
+        env: {
+            mongo: !!process.env.MONGODB_URI,
+            gemini: !!process.env.GEMINI_API_KEY
+        }
+    });
+});
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -216,7 +228,17 @@ app.use(express.static(publicPath));
 // The "catchall" handler: for any request that doesn't
 // match one above, send back React's index.html file.
 app.get('*', (req, res) => {
-    res.sendFile(path.join(publicPath, 'index.html'));
+    const indexPath = path.join(publicPath, 'index.html');
+    if (fs.existsSync(indexPath)) {
+        res.sendFile(indexPath);
+    } else {
+        console.error(`CRITICAL: index.html not found at ${indexPath}`);
+        res.status(200).send(`
+            <h1>Exam Grader Backend Running</h1>
+            <p>Frontend assets not found at expected path.</p>
+            <p>Debug Info: Public Path = ${publicPath}</p>
+        `);
+    }
 });
 
 // For Vercel Serverless, we export the app
