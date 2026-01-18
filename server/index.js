@@ -185,6 +185,12 @@ app.get('/api/history', protect, async (req, res) => {
     }
 });
 
-app.listen(port, () => {
-    console.log(`Server running on port ${port}`);
-});
+// For Vercel Serverless, we export the app
+// Local development will still work if we check if we are in a serverless environment
+if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+    app.listen(port, () => {
+        console.log(`Server running on port ${port}`);
+    });
+}
+
+module.exports = app;
