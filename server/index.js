@@ -241,9 +241,12 @@ app.get('*', (req, res) => {
     }
 });
 
-// For Vercel Serverless, we export the app
-// Local development will still work if we check if we are in a serverless environment
-if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
+// Start the server
+// In Railway/Render/etc - always listen on the port
+// In Vercel Serverless - export the app instead
+const isServerless = process.env.VERCEL;
+
+if (!isServerless) {
     app.listen(port, () => {
         console.log(`Server running on port ${port}`);
     });
