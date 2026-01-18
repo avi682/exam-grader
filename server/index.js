@@ -185,6 +185,16 @@ app.get('/api/history', protect, async (req, res) => {
     }
 });
 
+// Serve static files from the React app
+const path = require('path');
+app.use(express.static(path.join(__dirname, 'public')));
+
+// The "catchall" handler: for any request that doesn't
+// match one above, send back React's index.html file.
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
 // For Vercel Serverless, we export the app
 // Local development will still work if we check if we are in a serverless environment
 if (process.env.NODE_ENV !== 'production' && !process.env.VERCEL) {
