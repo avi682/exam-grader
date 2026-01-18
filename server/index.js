@@ -188,13 +188,28 @@ app.get('/api/history', protect, async (req, res) => {
 // Serve static files from the React app
 // Serve static files from the React app
 const path = require('path');
-// Vercel Serverless environment: use process.cwd() to find 'server/public'
-// Local environment: use __dirname (or path relative to where node is run)
-const publicPath = process.env.VERCEL
-    ? path.join(process.cwd(), 'server', 'public')
-    : path.join(__dirname, 'public');
+const fs = require('fs');
 
-console.log(`Serving static files from: ${publicPath}`);
+function getPublicPath() {
+    // Try multiple possible locations for the public folder
+    const possibilities = [
+        path.join(process.cwd(), 'server', 'public'), // Repo root -> server/public
+        path.join(process.cwd(), 'public'),           // Server root -> public
+        path.join(__dirname, 'public')                // Relative to script
+    ];
+
+    for (const p of possibilities) {
+        if (fs.existsSync(p)) {
+            console.log(`Found public folder at: ${p}`);
+            return p;
+        }
+    }
+    // Fallback
+    console.warn("Could not find public folder in standard locations, defaulting to relative public");
+    return path.join(__dirname, 'public');
+}
+
+const publicPath = getPublicPath();
 
 app.use(express.static(publicPath));
 
